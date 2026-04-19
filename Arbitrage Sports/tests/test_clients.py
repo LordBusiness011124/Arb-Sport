@@ -131,3 +131,18 @@ def test_kalshi_prefilter_reports_rejection_reason() -> None:
     )
 
     assert reason == "scope_qualified_market"
+
+
+def test_kalshi_prefilter_accepts_direct_team_label_outcomes() -> None:
+    reason = _matchable_market_rejection_reason(
+        event={"sub_title": "Boston Celtics vs New York Knicks"},
+        market={
+            "market_type": "binary",
+            "title": "Who will win?",
+            "yes_sub_title": "Boston Celtics",
+            "no_sub_title": "New York Knicks",
+            "rules_primary": "",
+        },
+    )
+
+    assert reason is None
