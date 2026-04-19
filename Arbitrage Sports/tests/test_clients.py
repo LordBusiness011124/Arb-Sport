@@ -6,7 +6,11 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from arb.clients.kalshi import KalshiClient, _parse_optional_datetime
+from arb.clients.kalshi import (
+    KalshiClient,
+    _matchable_market_rejection_reason,
+    _parse_optional_datetime,
+)
 from arb.clients.sportsbook import SportsbookClient
 
 
@@ -113,3 +117,17 @@ def test_sportsbook_client_rejects_naive_commence_time() -> None:
 
 def test_kalshi_client_rejects_naive_occurrence_datetime() -> None:
     assert _parse_optional_datetime("2026-04-20T19:00:00") is None
+
+
+def test_kalshi_prefilter_reports_rejection_reason() -> None:
+    reason = _matchable_market_rejection_reason(
+        event={"sub_title": "Boston Celtics vs New York Knicks"},
+        market={
+            "market_type": "binary",
+            "title": "Will Boston Celtics beat New York Knicks in the 1st quarter?",
+            "yes_sub_title": "Boston Celtics beats New York Knicks",
+            "rules_primary": "",
+        },
+    )
+
+    assert reason == "scope_qualified_market"
