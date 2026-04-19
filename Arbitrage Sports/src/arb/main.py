@@ -441,7 +441,12 @@ def _build_matchable_kalshi_market(
         return None
     event_team_a, event_team_b = teams
 
-    resolution_teams = _parse_resolution_matchup(snapshot.yes_sub_title)
+    resolution_teams = _parse_resolution_matchup(
+        snapshot.yes_sub_title,
+        snapshot.no_sub_title,
+        event_team_a,
+        event_team_b,
+    )
     if resolution_teams is None:
         return None
     yes_team, no_team = resolution_teams
@@ -477,29 +482,57 @@ def _parse_matchup_from_event_subtitle(event_sub_title: str) -> tuple[str, str] 
     if not cleaned or _contains_scope_text(cleaned):
         return None
 
-    match = re.match(r"^(?P<team_a>.+?)\s+vs\.?\s+(?P<team_b>.+?)$", cleaned, flags=re.IGNORECASE)
-    if match is None:
+    patterns = (
+        r"^(?P<team_a>.+?)\s+vs\.?\s+(?P<team_b>.+?)$",
+        r"^(?P<team_a>.+?)\s+@\s+(?P<team_b>.+?)$",
+        r"^(?P<team_a>.+?)\s+at\s+(?P<team_b>.+?)$",
+    )
+    for pattern in patterns:
+        match = re.match(pattern, cleaned, flags=re.IGNORECASE)
+        if match is not None:
+            return match.group("team_a").strip(), match.group("team_b").strip()
+    return None
+
+
+def _parse_resolution_matchup(
+    yes_sub_title: str,
+    no_sub_title: str,
+    event_team_a: str,
+    event_team_b: str,
+) -> tuple[str, str] | None:
+    """Extract YES/NO teams from structured outcome subtitles.
+
+    Supported safe forms:
+    - ``Team A beats Team B``
+    - ``yes_sub_title`` and ``no_sub_title`` are the two team names directly
+    """
+
+    cleaned_yes = yes_sub_title.strip()
+    cleaned_no = no_sub_title.strip()
+    if not cleaned_yes or _contains_scope_text(cleaned_yes):
         return None
-
-    return match.group("team_a").strip(), match.group("team_b").strip()
-
-
-def _parse_resolution_matchup(yes_sub_title: str) -> tuple[str, str] | None:
-    """Extract YES/NO teams from the structured YES subtitle."""
-
-    cleaned = yes_sub_title.strip()
-    if not cleaned or _contains_scope_text(cleaned):
+    if cleaned_no and _contains_scope_text(cleaned_no):
         return None
 
     match = re.match(
         r"^(?P<yes_team>.+?)\s+beats\s+(?P<no_team>.+?)$",
-        cleaned,
+        cleaned_yes,
         flags=re.IGNORECASE,
     )
-    if match is None:
-        return None
+    if match is not None:
+        return match.group("yes_team").strip(), match.group("no_team").strip()
 
-    return match.group("yes_team").strip(), match.group("no_team").strip()
+    normalized_event = {normalize_team_name(event_team_a), normalize_team_name(event_team_b)}
+    normalized_yes = normalize_team_name(cleaned_yes)
+    normalized_no = normalize_team_name(cleaned_no)
+    if (
+        cleaned_no
+        and normalized_yes != normalized_no
+        and {normalized_yes, normalized_no} == normalized_event
+    ):
+        return cleaned_yes, cleaned_no
+
+    return None
 
 
 def _contains_scope_qualifier(snapshot: KalshiMarketSnapshot) -> bool:
