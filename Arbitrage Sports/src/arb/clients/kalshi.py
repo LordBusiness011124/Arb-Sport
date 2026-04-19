@@ -8,6 +8,8 @@ YES and NO sides of each binary market.
 
 from __future__ import annotations
 
+import logging
+from collections import Counter
 from decimal import Decimal, InvalidOperation
 from datetime import UTC, datetime
 
@@ -17,6 +19,9 @@ from arb.models.market import KalshiMarketSnapshot, KalshiOrderLevel
 
 DEFAULT_KALSHI_BASE_URL = "https://api.elections.kalshi.com/trade-api/v2"
 MAX_KALSHI_EVENTS_PAGE_SIZE = 200
+MAX_REJECTION_SAMPLES = 5
+
+logger = logging.getLogger(__name__)
 
 
 class KalshiAPIError(RuntimeError):
@@ -159,6 +164,8 @@ class KalshiClient:
         }
 
         snapshots: list[KalshiMarketSnapshot] = []
+        rejection_counts: Counter[str] = Counter()
+        rejection_samples: list[str] = []
         cursor = ""
 
         while len(snapshots) < query_limit:
@@ -186,6 +193,8 @@ class KalshiClient:
                         event=event,
                         fetched_at=fetched_at,
                         remaining=query_limit - len(snapshots),
+                        rejection_counts=rejection_counts,
+                        rejection_samples=rejection_samples,
                     )
                 )
                 if len(snapshots) >= query_limit:
@@ -194,6 +203,14 @@ class KalshiClient:
             cursor = str(payload.get("cursor", "")).strip()
             if not cursor:
                 break
+
+        if not snapshots and rejection_counts:
+            logger.info(
+                "Kalshi prefilter rejected all candidate markets for series=%s. Reasons=%s. Samples=%s",
+                ",".join(series_prefixes),
+                dict(rejection_counts.most_common()),
+                rejection_samples,
+            )
 
         return snapshots
 
@@ -248,6 +265,8 @@ class KalshiClient:
         event: dict,
         fetched_at: datetime,
         remaining: int,
+        rejection_counts: Counter[str] | None = None,
+        rejection_samples: list[str] | None = None,
     ) -> list[KalshiMarketSnapshot]:
         """Normalize nested market payloads for one Kalshi event."""
 
@@ -260,7 +279,14 @@ class KalshiClient:
                 continue
             if str(market.get("status", "")).lower() not in {"open", "active"}:
                 continue
-            if not _looks_like_matchable_team_market(event, market):
+            rejection_reason = _matchable_market_rejection_reason(event, market)
+            if rejection_reason is not None:
+                if rejection_counts is not None:
+                    rejection_counts[rejection_reason] += 1
+                if rejection_samples is not None and len(rejection_samples) < MAX_REJECTION_SAMPLES:
+                    rejection_samples.append(
+                        _format_market_rejection_sample(event, market, rejection_reason)
+                    )
                 continue
 
             ticker = str(market.get("ticker", "")).strip()
@@ -422,11 +448,11 @@ def _merge_explicit_best_ask_level(
     return tuple(merged)
 
 
-def _looks_like_matchable_team_market(event: dict, market: dict) -> bool:
-    """Cheap prefilter to avoid fetching orderbooks for obviously irrelevant markets."""
+def _matchable_market_rejection_reason(event: dict, market: dict) -> str | None:
+    """Return why a Kalshi market is rejected by the cheap prefilter, if at all."""
 
     if str(market.get("market_type", "")).lower() != "binary":
-        return False
+        return "non_binary_market"
 
     event_sub_title = str(event.get("sub_title", "")).strip()
     yes_sub_title = str(market.get("yes_sub_title", "")).strip()
@@ -434,17 +460,34 @@ def _looks_like_matchable_team_market(event: dict, market: dict) -> bool:
     rules_primary = str(market.get("rules_primary", "")).strip()
 
     if " vs " not in event_sub_title.lower():
-        return False
+        return "event_subtitle_missing_vs"
     if " beats " not in yes_sub_title.lower():
-        return False
+        return "yes_subtitle_missing_beats"
     if " beat " not in market_title.lower():
-        return False
+        return "market_title_missing_beat"
 
     fields = (event_sub_title, yes_sub_title, market_title, rules_primary)
     if any(_contains_scope_text(field) for field in fields if field):
-        return False
+        return "scope_qualified_market"
 
-    return True
+    return None
+
+
+def _looks_like_matchable_team_market(event: dict, market: dict) -> bool:
+    """Cheap prefilter to avoid fetching orderbooks for obviously irrelevant markets."""
+
+    return _matchable_market_rejection_reason(event, market) is None
+
+
+def _format_market_rejection_sample(event: dict, market: dict, reason: str) -> str:
+    """Build a compact one-line sample for rejected Kalshi markets."""
+
+    return (
+        f"{reason}: ticker={market.get('ticker', '')} "
+        f"event_sub_title={str(event.get('sub_title', '')).strip()!r} "
+        f"market_title={str(market.get('title', '')).strip()!r} "
+        f"yes_sub_title={str(market.get('yes_sub_title', '')).strip()!r}"
+    )
 
 
 def _contains_scope_text(value: str) -> bool:
