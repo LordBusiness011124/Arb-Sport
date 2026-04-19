@@ -1,0 +1,42 @@
+{
+  "events": [
+    {
+      "category": "Sports",
+      "event_ticker": "KXNCAAB-UNCDUKE",
+      "series_ticker": "KXNCAAB",
+      "title": "North Carolina vs Duke",
+      "sub_title": "North Carolina vs Duke",
+      "markets": [
+        {
+          "ticker": "KXNCAAB-UNCDUKE-NC",
+          "title": "Will North Carolina beat Duke?",
+          "status": "active",
+          "market_type": "binary",
+          "occurrence_datetime": "2026-04-20T01:00:00Z",
+          "yes_sub_title": "North Carolina beats Duke",
+          "no_sub_title": "North Carolina beats Duke",
+          "rules_primary": "If North Carolina wins against Duke, then the market resolves to Yes.",
+          "yes_ask_dollars": "0.5000",
+          "yes_ask_size_fp": "25.00",
+          "no_ask_dollars": "0.5400",
+          "no_ask_size_fp": "20.00"
+        },
+        {
+          "ticker": "KXNCAAB-UNCDUKE-R1",
+          "title": "Will North Carolina beat Duke in the 1st half?",
+          "status": "active",
+          "market_type": "binary",
+          "occurrence_datetime": "2026-04-20T01:00:00Z",
+          "yes_sub_title": "North Carolina beats Duke in the 1st half",
+          "no_sub_title": "North Carolina beats Duke in the 1st half",
+          "rules_primary": "If North Carolina leads Duke at halftime, then the market resolves to Yes.",
+          "yes_ask_dollars": "0.4700",
+          "yes_ask_size_fp": "10.00",
+          "no_ask_dollars": "0.5600",
+          "no_ask_size_fp": "10.00"
+        }
+      ]
+    }
+  ],
+  "cursor": ""
+}
