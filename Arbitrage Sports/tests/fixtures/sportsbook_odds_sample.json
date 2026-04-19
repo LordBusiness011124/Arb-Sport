@@ -1,0 +1,33 @@
+[
+  {
+    "id": "evt-123",
+    "sport_key": "basketball_ncaab",
+    "sport_title": "NCAAB",
+    "commence_time": "2026-04-20T01:00:00Z",
+    "home_team": "North Carolina",
+    "away_team": "Duke",
+    "bookmakers": [
+      {
+        "key": "draftkings",
+        "title": "DraftKings",
+        "last_update": "2026-04-20T00:00:00Z",
+        "markets": [
+          {
+            "key": "h2h",
+            "last_update": "2026-04-20T00:00:00Z",
+            "outcomes": [
+              {
+                "name": "North Carolina",
+                "price": -125
+              },
+              {
+                "name": "Duke",
+                "price": 105
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]
